@@ -1,5 +1,5 @@
 import { NextAuthOptions } from "next-auth";
-import { VercelPostgresAdapter } from "@auth/pg-adapter";
+import VercelPostgresAdapter from "@auth/pg-adapter";
 import { sql } from "@vercel/postgres";
 import GoogleProvider from "next-auth/providers/google";
 
