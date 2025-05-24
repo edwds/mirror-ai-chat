@@ -1,10 +1,13 @@
 import { NextAuthOptions } from "next-auth";
 import VercelPostgresAdapter from "@auth/pg-adapter";
-import { sql } from "@vercel/postgres";
+import { Pool } from "@vercel/postgres";
 import GoogleProvider from "next-auth/providers/google";
 
+// Pool 인스턴스 생성
+const pool = new Pool();
+
 export const authOptions: NextAuthOptions = {
-  adapter: VercelPostgresAdapter(sql),
+  adapter: VercelPostgresAdapter(pool),
   session: {
     strategy: "jwt",
   },
