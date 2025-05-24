@@ -1,0 +1,34 @@
+export interface CameraInfo {
+  model_name: string;
+  manufacturer: string;
+  release_year: number | null;
+  camera_type?: string;
+  positioning?: string;
+  production_status?: string;
+  user_level?: string;
+  learning_curve?: string;
+  price?: any;
+  regional_availability?: any;
+  key_features?: any;
+  external_specs?: any;
+  technical_specs?: any;
+  video_features?: any;
+  smart_features?: any;
+  pros_cons?: any;
+  history_and_background?: any;
+  lens_information?: any;
+  recommended_accessories?: any;
+  usage_experience?: any;
+  photography_performance?: any;
+  firmware_information?: any;
+  notable_reviews?: any;
+  user_sentiment?: any;
+  image_samples?: any;
+  community_resources?: any;
+  similar_cameras?: any;
+  external_links?: any;
+  data_sources?: any;
+  last_updated?: string;
+  error?: any;
+  [key: string]: any;
+} 
