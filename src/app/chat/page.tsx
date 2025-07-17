@@ -302,7 +302,7 @@ export default function ChatPage() {
             const newMsgs = [
               ...msgs, 
               { 
-                role: "color-analysis", 
+                role: "color-analysis" as const, 
                 content: colorData, 
                 imageUrl 
               }
