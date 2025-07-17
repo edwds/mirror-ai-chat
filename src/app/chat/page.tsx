@@ -299,14 +299,12 @@ export default function ChatPage() {
           console.log('Image URL:', imageUrl);
           // 색감 분석 메시지 추가
           setMessages(msgs => {
-            const newMsgs = [
-              ...msgs, 
-              { 
-                role: "color-analysis" as const, 
-                content: colorData, 
-                imageUrl 
-              }
-            ];
+            const colorAnalysisMessage: Message = { 
+              role: "color-analysis", 
+              content: colorData, 
+              imageUrl 
+            };
+            const newMsgs = [...msgs, colorAnalysisMessage];
             console.log('New messages array length:', newMsgs.length);
             console.log('Last message:', newMsgs[newMsgs.length - 1]);
             return newMsgs;
