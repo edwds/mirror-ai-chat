@@ -60,6 +60,14 @@ export async function POST(req: Request) {
       id,
       file_url_service: serviceBlob.url,
       file_url_llm: llmBlob.url,
+      exif: {
+        brand: exif?.Make || null,
+        model: exif?.Model || null,
+        lens: exif?.LensModel || null,
+        aperture: exif?.FNumber || null,
+        shutter: exif?.ExposureTime || null,
+        iso: exif?.ISO || null
+      }
     });
   } catch (error) {
     console.error('Error uploading file:', error);

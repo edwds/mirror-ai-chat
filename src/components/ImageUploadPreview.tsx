@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 
 interface ImageUploadPreviewProps {
   file: File;
-  onUploadComplete: (url: string) => void;
+  onUploadComplete: (url: string, exif?: any) => void;
   onUploadError: (error: string) => void;
 }
 
@@ -36,7 +36,7 @@ export function ImageUploadPreview({ file, onUploadComplete, onUploadError }: Im
         }
 
         const data = await response.json();
-        onUploadComplete(data.file_url_service);
+        onUploadComplete(data.file_url_service, data.exif);
       } catch (error) {
         console.error('Upload error:', error);
         onUploadError('이미지 업로드 중 오류가 발생했습니다.');

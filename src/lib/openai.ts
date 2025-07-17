@@ -208,52 +208,87 @@ export async function getPhotographyAdvice(userQuery: string, userInfo?: any, hi
         }
       });
     }
-    const response = await openai.responses.create({
+
+    // 이미지 URL 추출 (개행 문자 포함하여 매칭)
+    const imageUrlMatch = userQuery.match(/\[이미지 URL\]\n(https?:\/\/[^\s\n]+)/);
+    const imageUrl = imageUrlMatch ? imageUrlMatch[1] : null;
+    
+    // 디버깅 로그
+    console.log('Original userQuery:', userQuery);
+    console.log('Extracted imageUrl:', imageUrl);
+    
+    // 이미지 URL을 제외한 텍스트 추출
+    const textQuery = userQuery.replace(/\[이미지 URL\]\nhttps?:\/\/[^\s\n]+\n?/, '').trim();
+    console.log('Text query after image removal:', textQuery);
+
+    // 사용자 메시지 콘텐츠 구성
+    const userContent: any[] = [
+      {
+        type: "input_text",
+        text: textQuery
+      }
+    ];
+
+    // 이미지가 있으면 추가
+    if (imageUrl) {
+      userContent.push({
+        type: "input_image",
+        source: {
+          type: "url",
+          url: imageUrl
+        }
+      });
+    }
+
+    // 시스템 메시지 구성
+    const systemMessage = {
+      role: "system" as const,
+      content: PHOTOGRAPHY_PROMPT + userInfoText + historyText
+    };
+
+    // 사용자 메시지 구성
+    const userMessage: any = {
+      role: "user" as const,
+      content: []
+    };
+
+    // 텍스트 추가 (이미지만 있는 경우 기본 텍스트 제공)
+    const finalTextQuery = textQuery || (imageUrl ? "이 이미지를 분석해주세요." : "");
+    if (finalTextQuery) {
+      userMessage.content.push({
+        type: "text",
+        text: finalTextQuery
+      });
+    }
+
+    // 이미지 추가 (있는 경우)
+    if (imageUrl) {
+      userMessage.content.push({
+        type: "image_url",
+        image_url: {
+          url: imageUrl,
+          detail: "high"
+        }
+      });
+    }
+
+    // 메시지 배열 구성
+    const messages = [systemMessage, userMessage];
+
+    console.log('Using model: gpt-4.1-mini');
+    console.log('Final messages:', JSON.stringify(messages, null, 2));
+
+    const response = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: PHOTOGRAPHY_PROMPT + userInfoText + historyText
-            }
-          ]
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: userQuery
-            }
-          ]
-        }
-      ],
-      text: {
-        format: {
-          type: "text"
-        }
-      },
-      reasoning: {},
-      tools: [
-        {
-          type: "web_search_preview",
-          user_location: {
-            type: "approximate"
-          },
-          search_context_size: "medium"
-        }
-      ],
+      messages: messages,
       temperature: 0.9,
-      max_output_tokens: 4096,
-      top_p: 0.95,
-      store: true
+      max_tokens: 4096,
+      top_p: 0.95
     });
 
     console.log('API Response:', JSON.stringify(response, null, 2));
     
-    return response.output_text || '';
+    return response.choices[0]?.message?.content || '';
   } catch (error) {
     console.error('Error getting photography advice:', error);
     throw error;
