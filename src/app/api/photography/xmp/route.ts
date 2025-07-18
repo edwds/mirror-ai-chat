@@ -17,8 +17,8 @@ export async function POST(req: Request) {
     // XMP 파일을 blob으로 반환
     return new Response(xmpContent, {
       headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="color-preset-${Date.now()}.xmp"`,
+        'Content-Type': 'application/vnd.adobe.xmp',
+        'Content-Disposition': `attachment; filename="lightroom-preset-${Date.now()}.xmp"`,
       },
     });
   } catch (error) {
@@ -37,17 +37,9 @@ function generateXMP(analysis: any): string {
   const toneCurve = lightroom_settings.tone_curve || {};
   const colorGrading = lightroom_settings.color_grading || {};
 
-  // HSL 값들을 XMP 형식으로 변환
-  const hslAdjustments = [
-    'Red', 'Orange', 'Yellow', 'Green', 'Aqua', 'Blue', 'Purple', 'Magenta'
-  ].map(color => {
-    const hslData = hsl[color.toLowerCase()] || { hue: 0, saturation: 0, luminance: 0 };
-    return `${hslData.hue || 0}, ${hslData.saturation || 0}, ${hslData.luminance || 0}`;
-  }).join(', ');
-
   const timestamp = new Date().toISOString();
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
+      return `<?xml version="1.0" encoding="UTF-8"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
@@ -101,14 +93,15 @@ function generateXMP(analysis: any): string {
     crs:LuminanceAdjustmentBlue="${hsl.blue?.luminance || 0}"
     crs:LuminanceAdjustmentPurple="${hsl.purple?.luminance || 0}"
     crs:LuminanceAdjustmentMagenta="${hsl.magenta?.luminance || 0}"
-    crs:ShadowTint="${colorGrading.shadows?.hue || 0}"
-    crs:ColorGradeShadowLum="0"
+    crs:ColorGradeShadowLum="${colorGrading.shadows?.luminance || 0}"
     crs:ColorGradeMidtoneHue="${colorGrading.midtones?.hue || 0}"
     crs:ColorGradeMidtoneSat="${colorGrading.midtones?.saturation || 0}"
-    crs:ColorGradeMidtoneLum="0"
+    crs:ColorGradeMidtoneLum="${colorGrading.midtones?.luminance || 0}"
     crs:ColorGradeHighlightHue="${colorGrading.highlights?.hue || 0}"
     crs:ColorGradeHighlightSat="${colorGrading.highlights?.saturation || 0}"
-    crs:ColorGradeHighlightLum="0"
+    crs:ColorGradeHighlightLum="${colorGrading.highlights?.luminance || 0}"
+    crs:ColorGradeShadowHue="${colorGrading.shadows?.hue || 0}"
+    crs:ColorGradeShadowSat="${colorGrading.shadows?.saturation || 0}"
     crs:ColorGradeBlending="50"
     crs:ColorGradeGlobalHue="0"
     crs:ColorGradeGlobalSat="0"
@@ -182,5 +175,5 @@ function generateXMP(analysis: any): string {
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>
-<?xpacket end="w"?>`;
+<?xpacket end="w"?>`; 
 } 

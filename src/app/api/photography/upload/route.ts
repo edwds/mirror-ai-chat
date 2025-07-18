@@ -27,20 +27,22 @@ export async function POST(req: Request) {
     // 3. EXIF 정보 추출
     const exif = await exifr.parse(buffer);
 
-    // 4. 이미지 리사이즈
+    // 4. 이미지 리사이즈 (색감 분석을 위해 더 높은 해상도 유지)
     const resized1024 = await sharp(buffer)
       .resize({ width: 1024, height: 1024, fit: 'inside' })
+      .jpeg({ quality: 95 }) // 색감 보존을 위해 고품질 JPEG 사용
       .toBuffer();
-    const resized512 = await sharp(buffer)
-      .resize({ width: 512, height: 512, fit: 'inside' })
+    const resized768 = await sharp(buffer)
+      .resize({ width: 768, height: 768, fit: 'inside' })
+      .jpeg({ quality: 90 }) // 색감 분석용 중간 해상도
       .toBuffer();
 
     // 5. Blob 업로드
     const id = crypto.randomUUID();
-    const serviceBlob = await put(`service/${userId}/${id}/1024.webp`, resized1024, {
+    const serviceBlob = await put(`service/${userId}/${id}/1024.jpg`, resized1024, {
       access: 'public',
     });
-    const llmBlob = await put(`llm/${userId}/${id}/512.webp`, resized512, {
+    const llmBlob = await put(`llm/${userId}/${id}/768.jpg`, resized768, {
       access: 'public',
     });
 

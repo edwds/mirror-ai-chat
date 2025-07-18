@@ -1,5 +1,6 @@
 export type Message =
-  | { role: "user" | "assistant"; content: string }
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string; suggestedQuestions?: string[] }
   | { role: "camera-info"; content: any }
   | { role: "image-upload"; file: File }
   | { role: "image-options"; url: string; exif?: any; selected?: string }

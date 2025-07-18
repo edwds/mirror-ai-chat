@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Paperclip, ArrowUp, ArrowDown, Square } from "lucide-react";
+import { Image, ArrowUp, ArrowDown, Square } from "lucide-react";
 import { motion } from "framer-motion";
 import React from "react";
 import LoginButton from "@/components/LoginButton";
@@ -37,10 +37,11 @@ export default function ChatPage() {
 
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const [chatBoxHeight, setChatBoxHeight] = useState(100); // 전체 인풋 박스 높이
+  const [chatBoxHeight, setChatBoxHeight] = useState(112); // 전체 인풋 박스 높이
   const BUTTON_AREA = 60;
 
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -100,10 +101,10 @@ export default function ChatPage() {
         // 실제 값이 비었거나 줄바꿈만 남았으면 min으로!
         const plainValue = chatInputRef.current.value.replace(/\s/g, "");
         if (!plainValue) {
-          setChatBoxHeight(100);
+          setChatBoxHeight(112);
         } else {
           const totalHeight = Math.max(
-            100,
+            112,
             Math.min(chatInputRef.current.scrollHeight + BUTTON_AREA, 200)
           );
           setChatBoxHeight(totalHeight);
@@ -137,7 +138,9 @@ export default function ChatPage() {
     if (!message.trim() && !file) return;
     // 일반 텍스트 메시지
     setInput("");
-    setChatBoxHeight(100);
+    setChatBoxHeight(112);
+    // 제안 질문 초기화
+    setSuggestedQuestions([]);
     
     // 숨김 모드가 아닐 때만 사용자 메시지 추가
     if (!isHidden) {
@@ -180,8 +183,27 @@ export default function ChatPage() {
 
       if (!response.ok) throw new Error('API 요청 실패');
       const data = await response.json();
-      // 응답 메시지 추가
-      setMessages(msgs => [...msgs, { role: "assistant", content: data.advice }]);
+      
+      // 제안 질문 파싱
+      const suggestedQuestionsMatch = data.advice.match(/\[SUGGESTED_QUESTIONS\]\s*(\[[\s\S]*?\])/);
+      let content = data.advice;
+      let suggestedQuestions: string[] | undefined;
+      
+      if (suggestedQuestionsMatch) {
+        try {
+          const questionsArray = JSON.parse(suggestedQuestionsMatch[1]);
+          if (Array.isArray(questionsArray) && questionsArray.length > 0) {
+            suggestedQuestions = questionsArray;
+            // 제안 질문 부분을 응답에서 제거
+            content = data.advice.replace(/\[SUGGESTED_QUESTIONS\]\s*\[[\s\S]*?\]/, '').trim();
+          }
+        } catch (parseError) {
+          console.warn('제안 질문 파싱 실패:', parseError);
+        }
+      }
+      
+      // 응답 메시지 추가 (제안 질문은 메시지에 저장)
+      setMessages(msgs => [...msgs, { role: "assistant", content, suggestedQuestions }]);
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") {
         setMessages(msgs => [...msgs, { role: "assistant", content: "⏹️ 응답이 중단되었습니다." }]);
@@ -223,6 +245,10 @@ export default function ChatPage() {
       try {
         const reviewData = JSON.parse(data.advice);
         if (reviewData.type === 'photo-review') {
+          // 제안 질문 저장
+          if (reviewData.suggested_questions) {
+            setSuggestedQuestions(reviewData.suggested_questions);
+          }
           // 두 개의 메시지로 분리: 요약 + 상세평가
           setMessages(msgs => [
             ...msgs, 
@@ -297,6 +323,10 @@ export default function ChatPage() {
           console.log('색감 분석 타입 확인됨, 메시지 추가 중...');
           console.log('Adding message with colorData:', colorData);
           console.log('Image URL:', imageUrl);
+          // 제안 질문 저장
+          if (colorData.suggested_questions) {
+            setSuggestedQuestions(colorData.suggested_questions);
+          }
           // 색감 분석 메시지 추가
           setMessages(msgs => {
             const colorAnalysisMessage: Message = { 
@@ -340,6 +370,16 @@ export default function ChatPage() {
     setIsLoading(false);
   };
 
+  // 제안 질문 클릭 핸들러
+  const handleSuggestedQuestionClick = (question: string) => {
+    setInput(question);
+    setSuggestedQuestions([]); // 질문 선택 후 제안 질문들 숨김
+    // 포커스를 텍스트 입력창으로 이동
+    if (chatInputRef.current) {
+      chatInputRef.current.focus();
+    }
+  };
+
   // 후속 액션 버튼 클릭 핸들러
   const handleActionClick = (action: string, url: string, idx: number, exif?: any) => {
     setMessages(msgs => {
@@ -353,13 +393,88 @@ export default function ChatPage() {
       const exifText = exif ?
         `카메라: ${exif.brand || "-"} ${exif.model || "-"}\n렌즈: ${exif.lens || "-"}\n조리개: ${exif.aperture || "-"}\n셔터: ${exif.shutter || "-"}\nISO: ${exif.iso || "-"}`
         : "(EXIF 정보 없음)";
-      const prompt = `아래 이미지를 전문 사진가의 시각으로 평가해 주세요.\n\n[이미지 URL]\n${url}\n\n[EXIF 정보]\n${exifText}\n\n[중요 지침]\n- EXIF 정보에서 "-" 또는 정보가 없는 항목은 응답에서 제외하거나 null로 설정하세요\n- 추측하지 말고 실제 데이터만 사용하세요\n- Unknown, likely, estimated 같은 추정 표현은 사용하지 마세요\n\n[요구 사항]\n- 한줄평, 5점 만점 점수, 카메라/렌즈/세팅, (가능하다면 ${reviewer}의 시각으로)\n- 강점 3가지, 개선점 3가지, 개선 방향성\n- composition, lighting, color, focus, creativity 5개 항목의 점수(1~5, 소수점 가능)와 각 항목별 상세 설명\n- 아래 JSON 스키마로만 답변(텍스트, 설명, 기타 부가정보 없이 JSON만 반환)\n\n[JSON 예시]\n{\n  "type": "photo-review",\n  "summary": {\n    "comment": "구도와 색감이 뛰어난 사진입니다.",\n    "score": 4.7,\n    "exif": {\n      "camera": "Sony A7 IV",\n      "lens": "FE 85mm F1.4 GM",\n      "aperture": "f/1.4",\n      "shutter": "1/500s",\n      "iso": "100"\n    },\n    "reviewer": "Barbara London"\n  },\n  "feedback": {\n    "strengths": ["표정 포착", "색감", "배경 흐림"],\n    "weaknesses": ["프레이밍", "하이라이트", "거리 부족"],\n    "direction": "프레이밍을 정돈하고 하이라이트 보정에 신경 쓰세요."\n  },\n  "detailed_scores": {\n    "composition": 4.5,\n    "lighting": 4.0,\n    "color": 4.8,\n    "focus": 4.2,\n    "creativity": 4.6\n  },\n  "detailed_comments": {\n    "composition": "프레임 중앙 안정감, 여백 추가 추천.",\n    "lighting": "자연광 활용, 하이라이트 일부 날아감.",\n    "color": "피부톤과 배경색 조화 우수.",\n    "focus": "눈에 정확히 초점.",\n    "creativity": "표정과 포즈 개성."\n  }\n}`;
+      const prompt = `아래 이미지를 전문 사진가의 시각으로 평가해 주세요.\n\n[이미지 URL]\n${url}\n\n[EXIF 정보]\n${exifText}\n\n[중요 지침]\n- EXIF 정보에서 "-" 또는 정보가 없는 항목은 응답에서 제외하거나 null로 설정하세요\n- 추측하지 말고 실제 데이터만 사용하세요\n- Unknown, likely, estimated 같은 추정 표현은 사용하지 마세요\n\n[요구 사항]\n- 한줄평, 5점 만점 점수, 카메라/렌즈/세팅, (가능하다면 ${reviewer}의 시각으로)\n- 강점 3가지, 개선점 3가지, 개선 방향성\n- composition, lighting, color, focus, creativity 5개 항목의 점수(1~5, 소수점 가능)와 각 항목별 상세 설명\n- 추가로 물어볼 수 있는 관련 질문 3가지 제안\n- 아래 JSON 스키마로만 답변(텍스트, 설명, 기타 부가정보 없이 JSON만 반환)\n\n[JSON 예시]\n{\n  "type": "photo-review",\n  "summary": {\n    "comment": "구도와 색감이 뛰어난 사진입니다.",\n    "score": 4.7,\n    "exif": {\n      "camera": "Sony A7 IV",\n      "lens": "FE 85mm F1.4 GM",\n      "aperture": "f/1.4",\n      "shutter": "1/500s",\n      "iso": "100"\n    },\n    "reviewer": "Barbara London"\n  },\n  "feedback": {\n    "strengths": ["표정 포착", "색감", "배경 흐림"],\n    "weaknesses": ["프레이밍", "하이라이트", "거리 부족"],\n    "direction": "프레이밍을 정돈하고 하이라이트 보정에 신경 쓰세요."\n  },\n  "detailed_scores": {\n    "composition": 4.5,\n    "lighting": 4.0,\n    "color": 4.8,\n    "focus": 4.2,\n    "creativity": 4.6\n  },\n  "detailed_comments": {\n    "composition": "프레임 중앙 안정감, 여백 추가 추천.",\n    "lighting": "자연광 활용, 하이라이트 일부 날아감.",\n    "color": "피부톤과 배경색 조화 우수.",\n    "focus": "눈에 정확히 초점.",\n    "creativity": "표정과 포즈 개성."\n  },\n  "suggested_questions": [\n    "이 사진을 더 드라마틱하게 편집하려면?",\n    "비슷한 스타일의 레퍼런스 사진 추천해줘",\n    "이 구도로 다른 장소에서 찍을 때 주의점은?"\n  ]\n}`;
       // 사진 평가는 숨김 모드로 전송하고, 응답을 photo-review 타입으로 처리
       handlePhotoReview(prompt, url);
       return;
     }
     if (action === "색감 추출") {
-      const prompt = `이 사진의 색감과 톤을 전문적으로 분석하고 라이트룸 보정값을 제공해 주세요.\n\n[이미지 URL]\n${url}\n\n[요구 사항]\n- 색온도, 틴트, 노출, 하이라이트, 섀도우, 화이트, 블랙, 텍스처, 선명도, 생동감, 채도 등 주요 보정값 분석\n- HSL 조정값 (색상별 색조/채도/명도)\n- 톤커브 분석\n- 색상 그레이딩 추천\n- 아래 JSON 스키마로만 답변(텍스트, 설명, 기타 부가정보 없이 JSON만 반환)\n\n[JSON 예시]\n{\n  "type": "color-analysis",\n  "summary": {\n    "style": "따뜻하고 부드러운 필름톤",\n    "mood": "감성적이고 로맨틱한 분위기",\n    "dominant_colors": ["주황", "베이지", "크림"]\n  },\n  "lightroom_settings": {\n    "basic": {\n      "temperature": 5400,\n      "tint": +8,\n      "exposure": +0.3,\n      "highlights": -65,\n      "shadows": +45,\n      "whites": +15,\n      "blacks": -20,\n      "texture": +10,\n      "clarity": -15,\n      "vibrance": +25,\n      "saturation": -10\n    },\n    "hsl": {\n      "red": {"hue": 0, "saturation": +10, "luminance": 0},\n      "orange": {"hue": -5, "saturation": +15, "luminance": +5},\n      "yellow": {"hue": +10, "saturation": +20, "luminance": 0},\n      "green": {"hue": 0, "saturation": -10, "luminance": 0},\n      "aqua": {"hue": 0, "saturation": 0, "luminance": 0},\n      "blue": {"hue": 0, "saturation": -5, "luminance": 0},\n      "purple": {"hue": 0, "saturation": 0, "luminance": 0},\n      "magenta": {"hue": 0, "saturation": 0, "luminance": 0}\n    },\n    "tone_curve": {\n      "lights": +10,\n      "darks": -5,\n      "highlights": -20,\n      "shadows": +15\n    },\n    "color_grading": {\n      "shadows": {"hue": 35, "saturation": 15},\n      "midtones": {"hue": 45, "saturation": 8},\n      "highlights": {"hue": 55, "saturation": 12}\n    }\n  },\n  "analysis": {\n    "color_palette": ["#F4E4BC", "#E8C4A0", "#D4A574"],\n    "temperature_analysis": "따뜻한 색온도로 황금시간대 느낌",\n    "contrast_level": "중간",\n    "saturation_level": "약간 높음",\n    "key_adjustments": ["하이라이트 복구", "섀도우 리프트", "오렌지톤 강조"]\n  }\n}`;
+      const prompt = `이 사진의 색감을 정밀하게 분석하고 실제 이미지의 색상 특성을 정확히 반영한 라이트룸 편집 설정을 제공해 주세요.
+
+[이미지 URL]
+${url}
+
+[분석 지침]
+1. **실제 이미지 관찰**: 이미지를 자세히 관찰하여 정확한 색상, 밝기, 대비를 파악하세요
+2. **색상 추출**: 이미지에서 실제로 보이는 주요 색상들을 정확한 HEX 코드로 추출하세요
+3. **현실적 보정값**: 실제 라이트룸에서 사용할 수 있는 현실적인 범위 내의 값들을 제공하세요
+4. **세밀한 조정**: 이미지의 특성에 맞는 세밀한 HSL 및 색상 그레이딩 설정을 제공하세요
+
+[요구 사항]
+- 색온도, 틴트, 노출, 하이라이트, 섀도우, 화이트, 블랙, 텍스처, 선명도, 생동감, 채도 등 정밀 분석
+- 8개 색상대역별 HSL 조정값 (실제 이미지 색상 기반)
+- 톤커브 4단계 조정값
+- 하이라이트/미드톤/섀도우별 색상 그레이딩
+- 실제 이미지에서 추출한 정확한 색상 팔레트 (HEX 코드)
+- 아래 JSON 스키마로만 답변 (텍스트 설명 없이 순수 JSON만)
+
+[JSON 스키마]
+{
+  "type": "color-analysis",
+  "summary": {
+    "style": "이미지의 실제 색감 스타일 설명",
+    "mood": "이미지에서 느껴지는 분위기",
+    "dominant_colors": ["실제 이미지의 주요 색상 3-5개"]
+  },
+  "analysis": {
+    "color_palette": ["#정확한HEX1", "#정확한HEX2", "#정확한HEX3", "#정확한HEX4", "#정확한HEX5"],
+    "temperature_bias": "실제 이미지의 색온도 경향 (warm/neutral/cool)",
+    "saturation_level": "실제 채도 수준 (low/medium/high)",
+    "contrast_type": "실제 대비 특성 (soft/medium/high)",
+    "key_adjustments": ["실제 필요한 주요 보정사항1", "보정사항2", "보정사항3"]
+  },
+  "lightroom_settings": {
+    "basic": {
+      "temperature": 실제값_범위_2000_to_9000,
+      "tint": 실제값_범위_minus150_to_plus150,
+      "exposure": 실제값_범위_minus5_to_plus5,
+      "highlights": 실제값_범위_minus100_to_plus100,
+      "shadows": 실제값_범위_minus100_to_plus100,
+      "whites": 실제값_범위_minus100_to_plus100,
+      "blacks": 실제값_범위_minus100_to_plus100,
+      "texture": 실제값_범위_minus100_to_plus100,
+      "clarity": 실제값_범위_minus100_to_plus100,
+      "vibrance": 실제값_범위_minus100_to_plus100,
+      "saturation": 실제값_범위_minus100_to_plus100
+    },
+    "hsl": {
+      "red": {"hue": 실제값_minus100_to_plus100, "saturation": 실제값, "luminance": 실제값},
+      "orange": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값},
+      "yellow": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값},
+      "green": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값},
+      "aqua": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값},
+      "blue": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값},
+      "purple": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값},
+      "magenta": {"hue": 실제값, "saturation": 실제값, "luminance": 실제값}
+    },
+    "tone_curve": {
+      "highlights": 실제값_minus100_to_plus100,
+      "lights": 실제값_minus100_to_plus100,
+      "darks": 실제값_minus100_to_plus100,
+      "shadows": 실제값_minus100_to_plus100
+    },
+    "color_grading": {
+      "shadows": {"hue": 실제값_0_to_360, "saturation": 실제값_0_to_100, "luminance": 실제값_minus100_to_plus100},
+      "midtones": {"hue": 실제값_0_to_360, "saturation": 실제값_0_to_100, "luminance": 실제값_minus100_to_plus100},
+      "highlights": {"hue": 실제값_0_to_360, "saturation": 실제값_0_to_100, "luminance": 실제값_minus100_to_plus100}
+    }
+  },
+  "suggested_questions": [
+    "이 색감을 다른 시간대에도 적용하려면?",
+    "반대 색감 스타일로 편집해보고 싶어",
+    "이 색감과 잘 어울리는 의상이나 소품은?"
+  ]
+}`;
       handleColorAnalysis(prompt, url);
       return;
     }
@@ -393,8 +508,8 @@ export default function ChatPage() {
               <div className="w-full relative">
                 <Textarea
                   ref={inputRef}
-                  className="w-full h-[100px] mb-4 pb-24 border border-gray-300 rounded-3xl text-lg px-6 py-4 resize-none placeholder:text-left placeholder:align-top bg-white/80 backdrop-blur"
-                  placeholder="Ask me anything..."
+                  className="w-full h-[112px] mb-4 pb-24 border border-gray-300 rounded-3xl text-lg px-6 py-4 resize-none placeholder:text-left placeholder:align-top bg-white/80 backdrop-blur"
+                  placeholder="사진에 대해 무엇이든 물어보세요..."
                   rows={4}
                   value={input}
                   onChange={handleInput}
@@ -420,9 +535,10 @@ export default function ChatPage() {
                   />
                   <label
                     htmlFor="file-upload"
-                    className="p-2 w-8 h-8 rounded-full text-gray-600 hover:text-gray-800 cursor-pointer flex items-center justify-center"
+                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 cursor-pointer rounded-full border border-gray-200/50 hover:border-gray-300 transition-colors"
                   >
-                    <Paperclip className="w-4 h-4" />
+                    <Image className="w-4 h-4" />
+                    <span className="text-sm font-medium">사진 분석</span>
                   </label>
                 </div>
                 <Button
@@ -481,6 +597,7 @@ export default function ChatPage() {
               isLoading={isLoading}
               handleActionClick={handleActionClick}
               setMessages={setMessages}
+              setSuggestedQuestions={setSuggestedQuestions}
             />
           </div>
 
@@ -516,6 +633,8 @@ export default function ChatPage() {
             chatInputRef={chatInputRef}
             chatBoxHeight={chatBoxHeight}
             BUTTON_AREA={BUTTON_AREA}
+            suggestedQuestions={suggestedQuestions}
+            onSuggestedQuestionClick={handleSuggestedQuestionClick}
           />
         </>
       )}

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Paperclip, ArrowUp, Square } from "lucide-react";
+import { Image, ArrowUp, Square } from "lucide-react";
 import React from "react";
 
 export function ChatInputBox({
@@ -14,7 +14,9 @@ export function ChatInputBox({
   handleChatInput,
   chatInputRef,
   chatBoxHeight,
-  BUTTON_AREA
+  BUTTON_AREA,
+  suggestedQuestions,
+  onSuggestedQuestionClick
 }: {
   input: string;
   setInput: React.Dispatch<React.SetStateAction<string>>;
@@ -28,9 +30,28 @@ export function ChatInputBox({
   chatInputRef: React.RefObject<HTMLTextAreaElement | null>;
   chatBoxHeight: number;
   BUTTON_AREA: number;
+  suggestedQuestions: string[];
+  onSuggestedQuestionClick: (question: string) => void;
 }) {
   return (
     <div className="w-full px-4 py-4 bg-[#F0E8FF]">
+      {/* 제안 질문들 */}
+      {suggestedQuestions.length > 0 && (
+        <div className="max-w-3xl mx-auto mb-3">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {suggestedQuestions.map((question, idx) => (
+              <button
+                key={idx}
+                onClick={() => onSuggestedQuestionClick(question)}
+                className="px-4 py-2 bg-white/80 hover:bg-white text-gray-600 hover:text-gray-800 rounded-full border border-gray-200 hover:border-gray-300 text-sm italic transition-all duration-200 backdrop-blur-sm whitespace-nowrap flex-shrink-0"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      
       <div
         className="relative max-w-3xl mx-auto border border-gray-300 rounded-3xl bg-white px-6 pt-4 pb-4 shadow-md transition-all duration-200"
         style={{ minHeight: chatBoxHeight, maxHeight: chatBoxHeight }}
@@ -40,13 +61,13 @@ export function ChatInputBox({
           className="w-full resize-none bg-transparent text-m outline-none"
           style={{
             height: chatBoxHeight - BUTTON_AREA,
-            minHeight: 40,
+            minHeight: 46,
             maxHeight: chatBoxHeight - BUTTON_AREA,
             overflowY: "auto",
             paddingRight: 48,
-            paddingBottom: 0,
+            paddingBottom: 12,
           }}
-          placeholder="Ask me anything..."
+          placeholder="사진에 대해 무엇이든 물어보세요..."
           value={input}
           onChange={handleChatInput}
           onInput={handleChatInput}
@@ -73,9 +94,10 @@ export function ChatInputBox({
             />
             <label
               htmlFor="chat-file-upload"
-              className="p-0 w-5 h-5 rounded-full text-gray-600 hover:text-gray-800 cursor-pointer flex items-center justify-center"
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 hover:border-gray-300 text-gray-700 hover:text-gray-900 cursor-pointer rounded-full transition-colors"
             >
-              <Paperclip className="w-5 h-5" />
+              <Image className="w-4 h-4" />
+              <span className="text-sm font-medium">사진 분석</span>
             </label>
           </div>
           {isLoading ? (

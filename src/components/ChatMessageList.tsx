@@ -7,6 +7,31 @@ import CameraCard from "@/components/CameraCard";
 import { ImageUploadPreview } from "@/components/ImageUploadPreview";
 import React, { useState, useEffect } from "react";
 import type { Message } from "@/types/message";
+import { AIProfile } from '@/components/AIProfile';
+import { getCurrentPersona } from '@/lib/personas';
+
+// AI 메시지 타입인지 확인하는 함수
+function isAIMessage(role: string): boolean {
+  return ['assistant', 'camera-info', 'photo-review-summary', 'photo-review-details', 'color-analysis'].includes(role);
+}
+
+// AI 프로필을 표시해야 하는지 판단하는 함수
+function shouldShowAIProfile(messages: Message[], currentIndex: number): boolean {
+  const currentMessage = messages[currentIndex];
+  
+  // 현재 메시지가 AI 메시지가 아니면 프로필 표시 안함
+  if (!isAIMessage(currentMessage.role)) {
+    return false;
+  }
+  
+  // 첫 번째 메시지이거나 이전 메시지가 사용자 메시지면 프로필 표시
+  if (currentIndex === 0) {
+    return true;
+  }
+  
+  const previousMessage = messages[currentIndex - 1];
+  return !isAIMessage(previousMessage.role);
+}
 
 // EXIF 데이터에서 추정 표현을 필터링하는 함수
 function filterExifValue(value: any): string | null {
@@ -278,31 +303,27 @@ function ColorSummaryCard({ analysis, imageUrl }: { analysis: any; imageUrl: str
                 <p className="text-lg font-semibold text-gray-800 leading-tight">{analysis.summary?.style}</p>
                 <p className="text-sm text-gray-500 mt-1">{analysis.summary?.mood}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {analysis.summary?.dominant_colors?.map((color: string, idx: number) => (
-                  <span key={idx} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-                    {color}
-                  </span>
-                ))}
-              </div>
             </div>
           </div>
 
           {/* 색상팔레트 */}
           {analysis.analysis?.color_palette && (
             <div className="space-y-3">
-              <h5 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">추출된 색상</h5>
+              <h5 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">사진 대표 색상</h5>
               <div className="flex gap-3 flex-wrap">
                 {analysis.analysis.color_palette.map((color: string, idx: number) => (
                   <div key={idx} className="flex flex-col items-center group">
                     <div 
-                      className="w-10 h-10 rounded-lg shadow-sm border border-gray-200 group-hover:scale-105 transition-transform"
+                      className="w-12 h-12 rounded-lg shadow-md border border-gray-300 group-hover:scale-105 transition-transform cursor-pointer"
                       style={{ backgroundColor: color }}
+                      title={`색상: ${color}`}
+                      onClick={() => navigator.clipboard.writeText(color)}
                     />
-                    <span className="text-xs text-gray-500 mt-1.5 font-mono">{color}</span>
+                    <span className="text-xs text-gray-600 mt-1.5 font-mono font-semibold">{color.toUpperCase()}</span>
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-gray-500 italic">색상을 클릭하면 HEX 코드가 복사됩니다</p>
             </div>
           )}
 
@@ -525,7 +546,7 @@ function ColorHSLCard({ analysis }: { analysis: any }) {
           </div>
 
           {/* 탭 콘텐츠 */}
-          <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
+          <div className="space-y-4 flex-1">
             {colors.map((color) => {
               const values = analysis.lightroom_settings?.hsl?.[color];
               if (!values) return null;
@@ -609,7 +630,7 @@ function ColorAdvancedCard({ analysis }: { analysis: any }) {
                       {/* 컬러 휠 */}
                       <div className="relative w-20 h-20 flex-shrink-0 group">
                         <div 
-                          className="w-full h-full rounded-full shadow-lg group-hover:shadow-xl transition-shadow"
+                          className="w-full h-full rounded-full"
                           style={{
                             background: `conic-gradient(
                               hsl(0, 100%, 50%),
@@ -672,13 +693,27 @@ function ColorAdvancedCard({ analysis }: { analysis: any }) {
 }
 
 // 어시스턴트 메시지 버블 분리
-function AssistantMessageBubble({ content }: { content: string }) {
+function AssistantMessageBubble({ content, onAnimationComplete }: { content: string; onAnimationComplete?: () => void }) {
   const paragraphs = content.split(/\n{2,}/);
   const [visibleParagraphs, setVisibleParagraphs] = useState(0);
+  const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
+    // 이미 애니메이션이 실행되었으면 다시 실행하지 않음
+    if (hasAnimated) {
+      setVisibleParagraphs(paragraphs.length); // 모든 문단 즉시 표시
+      return;
+    }
+
     setVisibleParagraphs(0);
-    if (paragraphs.length === 0) return;
+    if (paragraphs.length === 0) {
+      // 빈 내용인 경우 즉시 콜백 호출
+      setHasAnimated(true);
+      if (onAnimationComplete) {
+        setTimeout(() => onAnimationComplete(), 100);
+      }
+      return;
+    }
     let current = 0;
     let timer: NodeJS.Timeout | null = null;
 
@@ -687,6 +722,12 @@ function AssistantMessageBubble({ content }: { content: string }) {
       current++;
       if (current < paragraphs.length) {
         timer = setTimeout(showNext, 1000); // 문단 사이 텀 1초
+      } else {
+        // 모든 문단 표시 완료 시 콜백 호출
+        setHasAnimated(true);
+        if (onAnimationComplete) {
+          setTimeout(() => onAnimationComplete(), 500); // 마지막 문단 안정화 후 500ms 대기
+        }
       }
     };
     timer = setTimeout(showNext, 200); // 첫 문단도 살짝 delay
@@ -694,7 +735,7 @@ function AssistantMessageBubble({ content }: { content: string }) {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [content]);
+  }, [content, paragraphs.length, hasAnimated, onAnimationComplete]);
 
   useEffect(() => {
     const el = document.querySelector('.flex-1.overflow-y-auto.w-full');
@@ -757,12 +798,14 @@ export function ChatMessageList({
   messages,
   isLoading,
   handleActionClick,
-  setMessages
+  setMessages,
+  setSuggestedQuestions
 }: {
   messages: Message[];
   isLoading: boolean;
   handleActionClick: (action: string, url: string, idx: number, exif?: any) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setSuggestedQuestions: React.Dispatch<React.SetStateAction<string[]>>;
 }) {
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -794,17 +837,34 @@ export function ChatMessageList({
             </div>
           );
         } else if (msg.role === "camera-info") {
+          const showProfile = shouldShowAIProfile(messages, idx);
           return (
             <div key={idx} className="flex mb-4 justify-start">
-              <div className="flex items-end gap-2 w-full">
-                <CameraCard camera={msg.content} />
+              <div className="flex flex-col w-full">
+                {showProfile && <AIProfile persona={getCurrentPersona(msg.role)} />}
+                <div className="flex items-end gap-2 w-full">
+                  <CameraCard camera={msg.content} />
+                </div>
               </div>
             </div>
           );
         } else if (msg.role === "assistant") {
+          const showProfile = shouldShowAIProfile(messages, idx);
+          const handleAnimationComplete = () => {
+            if (msg.suggestedQuestions && msg.suggestedQuestions.length > 0) {
+              setSuggestedQuestions(msg.suggestedQuestions);
+            }
+          };
+          
           return (
             <div key={idx} className="flex mb-4 justify-start">
-              <AssistantMessageBubble content={msg.content} />
+              <div className="flex flex-col w-full">
+                {showProfile && <AIProfile persona={getCurrentPersona(msg.role)} />}
+                <AssistantMessageBubble 
+                  content={msg.content} 
+                  onAnimationComplete={handleAnimationComplete}
+                />
+              </div>
             </div>
           );
         } else if (msg.role === "user") {
@@ -844,30 +904,38 @@ export function ChatMessageList({
 
           return (
             <div key={idx} className="flex flex-col mb-4 items-start space-y-4">
-              {/* 업로드된 이미지 */}
-              <div className="flex justify-end w-full">
+              {/* 1. 업로드된 이미지 - 즉시 표시 */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="flex justify-end w-full"
+              >
                 <img
                   src={msg.url}
                   alt="Uploaded"
                   className="w-60 h-auto max-h-80 object-cover rounded-2xl shadow-lg ml-auto"
                 />
-              </div>
+              </motion.div>
               
-              {/* AI 대화형 메시지 - 왼쪽 정렬 */}
+              {/* 2. AI 대화형 메시지 - 0.5초 후 표시 */}
               {!msg.selected && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
                   className="flex justify-start w-full"
                 >
-                  <Card className="p-4 mb-3 shadow-none border-0 bg-white text-black rounded-3xl rounded-tl-md max-w-[80%] w-fit">
-                    어떤 분석을 도와드릴까요? 🤔
-                  </Card>
+                  <div className="flex flex-col w-full">
+                    <AIProfile persona={getCurrentPersona('assistant')} />
+                    <Card className="p-4 mb-3 shadow-none border-0 bg-white text-black rounded-3xl rounded-tl-md max-w-[80%] w-fit">
+                      어떤 분석을 도와드릴까요? 🤔
+                    </Card>
+                  </div>
                 </motion.div>
               )}
               
-              {/* 옵션 버튼들 - 오른쪽 정렬 */}
+              {/* 3. 옵션 버튼들 - 1초 후 순차 표시 */}
               <div className="flex flex-col gap-2 w-full">
                 {!msg.selected ? (
                   actions.map((action, actionIdx) => (
@@ -875,13 +943,13 @@ export function ChatMessageList({
                       key={action.key}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: actionIdx * 0.1 }}
+                      transition={{ duration: 0.3, delay: 1.0 + (actionIdx * 0.1) }}
                       className="flex justify-end"
                     >
-                                              <button
-                          onClick={() => handleActionClick(action.key, msg.url, idx, msg.exif)}
-                          className="px-4 py-3 bg-white text-gray-700 rounded-3xl rounded-tr-md max-w-[80%] w-fit shadow-sm"
-                        >
+                      <button
+                        onClick={() => handleActionClick(action.key, msg.url, idx, msg.exif)}
+                        className="px-4 py-3 bg-white text-gray-700 rounded-3xl rounded-tr-md max-w-[80%] w-fit shadow-sm"
+                      >
                         {action.display}
                       </button>
                     </motion.div>
@@ -905,17 +973,20 @@ export function ChatMessageList({
           // 다음 메시지가 photo-review-details인지 확인
           const nextMsg = messages[idx + 1];
           const hasDetailsCard = nextMsg && nextMsg.role === "photo-review-details";
+          const showProfile = shouldShowAIProfile(messages, idx);
           
           return (
             <div key={idx} className="flex mb-4 justify-start w-full">
-              <div 
-                className="flex gap-4 overflow-x-auto w-full max-w-5xl pb-2 scroll-smooth"
-                style={{
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: '#D1D5DB #F3F4F6',
-                  scrollBehavior: 'smooth'
-                }}
-              >
+              <div className="flex flex-col w-full">
+                {showProfile && <AIProfile persona={getCurrentPersona(msg.role)} />}
+                <div 
+                  className="flex gap-4 overflow-x-auto w-full max-w-5xl pb-2 scroll-smooth"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#D1D5DB #F3F4F6',
+                    scrollBehavior: 'smooth'
+                  }}
+                >
                 {/* 사진 평가 요약 카드 */}
                 <div className="flex-shrink-0 h-full">
                   <div className="h-full">
@@ -931,6 +1002,7 @@ export function ChatMessageList({
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           );
@@ -940,9 +1012,13 @@ export function ChatMessageList({
           const isStandalone = !prevMsg || prevMsg.role !== "photo-review-summary";
           
           if (isStandalone) {
+            const showProfile = shouldShowAIProfile(messages, idx);
             return (
               <div key={idx} className="flex mb-4 justify-start">
-                <PhotoReviewDetailsCard review={msg.content} />
+                <div className="flex flex-col w-full">
+                  {showProfile && <AIProfile persona={getCurrentPersona(msg.role)} />}
+                  <PhotoReviewDetailsCard review={msg.content} />
+                </div>
               </div>
             );
           }
@@ -950,16 +1026,19 @@ export function ChatMessageList({
           // photo-review-summary와 함께 렌더링되는 경우 null 반환
           return null;
         } else if (msg.role === "color-analysis") {
+          const showProfile = shouldShowAIProfile(messages, idx);
           return (
             <div key={idx} className="flex mb-4 justify-start w-full">
-              <div 
-                className="flex gap-4 overflow-x-auto w-full max-w-5xl pb-2 scroll-smooth"
-                style={{
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: '#D1D5DB #F3F4F6',
-                  scrollBehavior: 'smooth'
-                }}
-              >
+              <div className="flex flex-col w-full">
+                {showProfile && <AIProfile persona={getCurrentPersona(msg.role)} />}
+                <div 
+                  className="flex gap-4 overflow-x-auto w-full max-w-5xl pb-2 scroll-smooth"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#D1D5DB #F3F4F6',
+                    scrollBehavior: 'smooth'
+                  }}
+                >
                 {/* 1번 카드: 색감 분석 요약 */}
                 <div className="flex-shrink-0 h-full">
                   <div className="h-full">
@@ -986,6 +1065,7 @@ export function ChatMessageList({
                   <div className="h-full">
                     <ColorAdvancedCard analysis={msg.content} />
                   </div>
+                </div>
                 </div>
               </div>
             </div>
