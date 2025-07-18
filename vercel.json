@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "src/app/api/photography/upload/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/photography/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/photography/xmp/route.ts": {
+      "maxDuration": 10
+    }
+  },
+  "regions": ["icn1"],
+  "build": {
+    "env": {
+      "NEXT_SHARP": "1"
+    }
+  }
+} 
