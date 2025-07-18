@@ -16,8 +16,9 @@ export function ImageUpload() {
       return;
     }
 
-    // 파일 크기 검사 (10MB 제한)
-    if (file.size > 10 * 1024 * 1024) {
+    // 파일 크기 검사 (30MB 제한)
+    if (file.size > 30 * 1024 * 1024) {
+      alert('파일 크기가 너무 큽니다. 최대 30MB까지 업로드 가능합니다.');
       return;
     }
 
