@@ -32,61 +32,114 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid chunk data' }, { status: 400 });
     }
 
-    console.log(`📦 Received chunk ${chunkIndex + 1}/${totalChunks} for upload ${uploadId}`);
+      console.log(`📦 Received chunk ${chunkIndex + 1}/${totalChunks} for upload ${uploadId}`);
 
-    // 3. 청크를 버퍼로 변환
-    const chunkBuffer = Buffer.from(await chunk.arrayBuffer());
+      // 3. 청크를 버퍼로 변환 (빈 청크는 상태 확인용)
+      const chunkBuffer = Buffer.from(await chunk.arrayBuffer());
+      const isStatusCheck = chunkBuffer.length === 0;
 
-    // 4. 청크 저장
-    if (!chunkStore.has(uploadId)) {
-      chunkStore.set(uploadId, {
-        chunks: new Array(totalChunks),
-        totalChunks,
-        metadata: { originalName, totalSize, userId }
-      });
-    }
+      // 4. 상태 확인 요청인 경우 기존 데이터 확인
+      if (isStatusCheck) {
+        console.log(`🔍 Status check for upload ${uploadId}`);
+        
+        if (!chunkStore.has(uploadId)) {
+          // 데이터가 없으면 이미 완료되었을 가능성
+          return NextResponse.json({
+            success: true,
+            completed: true,
+            message: 'Upload already completed'
+          });
+        }
+        
+        const uploadData = chunkStore.get(uploadId)!;
+        const receivedChunks = uploadData.chunks.filter(chunk => chunk !== undefined).length;
+        
+        if (receivedChunks === totalChunks) {
+          // 모든 청크가 있으면 조립 수행
+          console.log('🔧 Status check triggered file assembly...');
+          
+          const completeFile = Buffer.concat(uploadData.chunks);
+          const fileExtension = originalName.split('.').pop() || 'jpg';
+          
+          // Vercel Blob에 업로드
+          const fileId = uploadId;
+          const blob = await put(`uploads/${userId}/${fileId}/original.${fileExtension}`, completeFile, {
+            access: 'public',
+          });
 
-    const uploadData = chunkStore.get(uploadId)!;
-    uploadData.chunks[chunkIndex] = chunkBuffer;
+          // 임시 데이터 정리
+          chunkStore.delete(uploadId);
 
-    // 5. 모든 청크가 도착했는지 확인
-    const receivedChunks = uploadData.chunks.filter(chunk => chunk !== undefined).length;
-    console.log(`📊 Progress: ${receivedChunks}/${totalChunks} chunks received`);
+          console.log('✅ File assembled via status check:', blob.url);
 
-    if (receivedChunks === totalChunks) {
-      // 모든 청크가 도착했으면 파일 재조립
-      console.log('🔧 All chunks received, assembling file...');
-      
-      const completeFile = Buffer.concat(uploadData.chunks);
-      const fileExtension = originalName.split('.').pop() || 'jpg';
-      
-      // Vercel Blob에 업로드
-      const fileId = uploadId;
-      const blob = await put(`uploads/${userId}/${fileId}/original.${fileExtension}`, completeFile, {
-        access: 'public',
-      });
+          return NextResponse.json({
+            success: true,
+            completed: true,
+            file_url: blob.url,
+            file_id: fileId,
+            metadata: uploadData.metadata
+          });
+        } else {
+          return NextResponse.json({
+            success: true,
+            completed: false,
+            received: receivedChunks,
+            total: totalChunks,
+            message: 'Still waiting for chunks'
+          });
+        }
+      }
 
-      // 임시 데이터 정리
-      chunkStore.delete(uploadId);
+      // 5. 일반 청크 저장
+      if (!chunkStore.has(uploadId)) {
+        chunkStore.set(uploadId, {
+          chunks: new Array(totalChunks),
+          totalChunks,
+          metadata: { originalName, totalSize, userId }
+        });
+      }
 
-      console.log('✅ File assembled and uploaded to Blob:', blob.url);
+      const uploadData = chunkStore.get(uploadId)!;
+      uploadData.chunks[chunkIndex] = chunkBuffer;
 
-      return NextResponse.json({
-        success: true,
-        completed: true,
-        file_url: blob.url,
-        file_id: fileId,
-        metadata: uploadData.metadata
-      });
-    } else {
-      // 아직 더 기다려야 함
-      return NextResponse.json({
-        success: true,
-        completed: false,
-        received: receivedChunks,
-        total: totalChunks
-      });
-    }
+      // 6. 모든 청크가 도착했는지 확인
+      const receivedChunks = uploadData.chunks.filter(chunk => chunk !== undefined).length;
+      console.log(`📊 Progress: ${receivedChunks}/${totalChunks} chunks received`);
+
+      if (receivedChunks === totalChunks) {
+        // 모든 청크가 도착했으면 파일 재조립
+        console.log('🔧 All chunks received, assembling file...');
+        
+        const completeFile = Buffer.concat(uploadData.chunks);
+        const fileExtension = originalName.split('.').pop() || 'jpg';
+        
+        // Vercel Blob에 업로드
+        const fileId = uploadId;
+        const blob = await put(`uploads/${userId}/${fileId}/original.${fileExtension}`, completeFile, {
+          access: 'public',
+        });
+
+        // 임시 데이터 정리
+        chunkStore.delete(uploadId);
+
+        console.log('✅ File assembled and uploaded to Blob:', blob.url);
+
+        return NextResponse.json({
+          success: true,
+          completed: true,
+          file_url: blob.url,
+          file_id: fileId,
+          metadata: uploadData.metadata
+        });
+      } else {
+        // 아직 더 기다려야 함
+        return NextResponse.json({
+          success: true,
+          completed: false,
+          received: receivedChunks,
+          total: totalChunks
+        });
+      }
 
   } catch (error) {
     console.error('Error in chunk upload:', error);

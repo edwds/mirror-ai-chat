@@ -813,26 +813,24 @@ export function ChatMessageList({
         if (msg.role === "image-upload") {
           return (
             <div key={idx} className="flex mb-4 justify-end">
-              <div className="flex items-end gap-2 w-full">
-                <Card className="p-4 max-w-[85%] relative shadow-none border-0 bg-gradient-to-r from-[#7B47F0] via-[#6055F0] to-[#4762F0] text-white ml-auto rounded-3xl rounded-tr-md">
-                  <ImageUploadPreview
-                    file={msg.file}
-                    onUploadComplete={(url: string, exif?: any) => {
-                      setMessages(msgs => {
-                        const newMsgs = [...msgs];
-                        newMsgs[idx] = { role: "image-options", url, exif };
-                        return newMsgs;
-                      });
-                    }}
-                    onUploadError={(error: string) => {
-                      setMessages(msgs => {
-                        const newMsgs = [...msgs];
-                        newMsgs[idx] = { role: "user", content: `[업로드 실패: ${error}]` };
-                        return newMsgs;
-                      });
-                    }}
-                  />
-                </Card>
+              <div className="flex justify-end w-full">
+                <ImageUploadPreview
+                  file={msg.file}
+                  onUploadComplete={(url: string, exif?: any) => {
+                    setMessages(msgs => {
+                      const newMsgs = [...msgs];
+                      newMsgs[idx] = { role: "image-options", url, exif };
+                      return newMsgs;
+                    });
+                  }}
+                  onUploadError={(error: string) => {
+                    setMessages(msgs => {
+                      const newMsgs = [...msgs];
+                      newMsgs[idx] = { role: "user", content: `[업로드 실패: ${error}]` };
+                      return newMsgs;
+                    });
+                  }}
+                />
               </div>
             </div>
           );
@@ -911,11 +909,13 @@ export function ChatMessageList({
                 transition={{ duration: 0.4 }}
                 className="flex justify-end w-full"
               >
-                <img
-                  src={msg.url}
-                  alt="Uploaded"
-                  className="w-60 h-auto max-h-80 object-cover rounded-2xl shadow-lg ml-auto"
-                />
+                <div className="w-full max-w-sm">
+                  <img
+                    src={msg.url}
+                    alt="Uploaded"
+                    className="w-full h-auto max-h-80 object-cover rounded-lg shadow-lg"
+                  />
+                </div>
               </motion.div>
               
               {/* 2. AI 대화형 메시지 - 0.5초 후 표시 */}

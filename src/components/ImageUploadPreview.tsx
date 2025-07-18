@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { Progress } from '@/components/ui/progress';
 
 interface ImageUploadPreviewProps {
@@ -86,8 +85,43 @@ export function ImageUploadPreview({ file, onUploadComplete, onUploadError }: Im
         setStatusMessage('모든 조각 업로드 완료 대기 중...');
         const results = await Promise.all(uploadPromises);
         
-        // 마지막 응답에서 완료된 파일 URL 확인
-        const completedResult = results.find(r => r.completed);
+        // 완료된 결과가 있는지 확인 (병렬 업로드에서 마지막 청크에만 completed가 true)
+        let completedResult = results.find(r => r.completed);
+        
+        // 완료 결과가 없으면 잠시 대기 후 재시도 (서버 처리 시간 고려)
+        if (!completedResult) {
+          setStatusMessage('파일 조립 완료 대기 중...');
+          
+          // 짧은 지연 후 재시도 (서버에서 마지막 청크 처리 시간)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // 마지막 청크 재확인 요청 (가장 높은 인덱스)
+          const lastChunkIndex = totalChunks - 1;
+          const formData = new FormData();
+          formData.append('chunk', new Blob([''])); // 빈 청크로 상태 확인용
+          formData.append('uploadId', uploadId);
+          formData.append('chunkIndex', lastChunkIndex.toString());
+          formData.append('totalChunks', totalChunks.toString());
+          formData.append('originalName', file.name);
+          formData.append('totalSize', file.size.toString());
+
+          try {
+            const checkResponse = await fetch('/api/photography/upload-chunk', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (checkResponse.ok) {
+              const checkResult = await checkResponse.json();
+              if (checkResult.completed) {
+                completedResult = checkResult;
+              }
+            }
+          } catch (error) {
+            console.log('Status check failed, continuing with available results');
+          }
+        }
+        
         if (!completedResult) {
           throw new Error('파일 조립이 완료되지 않았습니다.');
         }
@@ -123,10 +157,12 @@ export function ImageUploadPreview({ file, onUploadComplete, onUploadError }: Im
 
         setProgress(100);
         setStatusMessage('완료!');
+        setIsUploading(false); // 블러 제거
         
+        // 블러가 사라진 후 다음 단계로 진행
         setTimeout(() => {
           onUploadComplete(processData.file_url_service, processData.exif);
-        }, 500);
+        }, 800);
 
       } catch (error: any) {
         const totalTime = Date.now() - startTime;
@@ -160,37 +196,24 @@ export function ImageUploadPreview({ file, onUploadComplete, onUploadError }: Im
   }, [file, onUploadComplete, onUploadError]);
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-sm">
       {/* 이미지 미리보기 */}
-      <div className="relative aspect-square w-full max-w-sm mx-auto mb-4 rounded-lg overflow-hidden bg-gray-100">
+      <div className="relative w-full max-h-80 rounded-lg overflow-hidden bg-gray-100">
         {preview && (
-          <Image
+          <img
             src={preview}
             alt="업로드 이미지 미리보기"
-            fill
-            className="object-cover"
-            unoptimized
+            className={`w-full h-auto max-h-80 object-cover rounded-lg shadow-lg transition-all duration-300 ${isUploading ? 'blur-sm' : 'blur-0'}`}
           />
         )}
+        
+        {/* 프로그레스바 오버레이 */}
         {isUploading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-              <div className="text-sm">{statusMessage}</div>
-            </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <Progress value={progress} className="h-2 bg-white/20" />
           </div>
         )}
       </div>
-
-      {/* 진행 상태 */}
-      {isUploading && (
-        <div className="space-y-2">
-          <Progress value={progress} className="h-2" />
-          <div className="text-xs text-gray-500 text-center">
-            {statusMessage} ({Math.round(progress)}%)
-          </div>
-        </div>
-      )}
 
       {/* 파일 정보 */}
       <div className="text-xs text-gray-400 text-center mt-2">
