@@ -168,7 +168,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { 
         error: errorMessage,
-        debug: process.env.NODE_ENV === 'development' ? error.message : undefined
+        debug: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
       },
       { status: 500 }
     );
