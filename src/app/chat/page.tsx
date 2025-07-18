@@ -123,14 +123,30 @@ export default function ChatPage() {
       if (e.target) e.target.value = "";
       return;
     }
+    
     const file = e.target.files?.[0];
-    if (file) {
-      setFile(file);
-      setMessages(msgs => [...msgs, { 
-        role: "image-upload", 
-        file 
-      }]);
+    if (!file) return;
+
+    // 파일 타입 검사
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드 가능합니다.');
+      if (e.target) e.target.value = "";
+      return;
     }
+
+    // 파일 크기 검사 (100MB 제한)
+    if (file.size > 100 * 1024 * 1024) {
+      alert('파일 크기가 너무 큽니다. 최대 100MB까지 업로드 가능합니다.');
+      if (e.target) e.target.value = "";
+      return;
+    }
+
+    // 직접 업로드 진행
+    setFile(file);
+    setMessages(msgs => [...msgs, { 
+      role: "image-upload", 
+      file 
+    }]);
   };
 
   const handleSend = async (overrideMessage?: string, isHidden?: boolean) => {

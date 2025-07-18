@@ -19,27 +19,26 @@ export async function POST(req: Request) {
     }
     const userId = session.user.id;
 
-    // 2. 파일 파싱
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    // 2. JSON 데이터 파싱 (이제 파일이 아닌 URL을 받음)
+    const body = await req.json();
+    const { file_url, file_id, original_name, file_size } = body;
+    
+    if (!file_url || !file_id) {
+      return NextResponse.json({ error: 'file_url and file_id are required' }, { status: 400 });
     }
 
-    // 파일 크기 검사 (30MB 제한)
-    if (file.size > 30 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: '파일 크기가 너무 큽니다. 최대 30MB까지 업로드 가능합니다.' },
-        { status: 400 }
-      );
+    // 3. 업로드된 이미지를 URL에서 다운로드
+    const imageResponse = await fetch(file_url);
+    if (!imageResponse.ok) {
+      throw new Error('Failed to fetch uploaded image');
     }
+    
+    const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // 3. EXIF 정보 추출
+    // 4. EXIF 정보 추출
     const exif = await exifr.parse(buffer);
 
-    // 4. 이미지 리사이즈 (색감 분석을 위해 더 높은 해상도 유지)
+    // 5. 이미지 리사이즈 (색감 분석을 위해 더 높은 해상도 유지)
     const resized1024 = await sharp(buffer)
       .resize({ width: 1024, height: 1024, fit: 'inside' })
       .jpeg({ quality: 95 }) // 색감 보존을 위해 고품질 JPEG 사용
@@ -49,31 +48,31 @@ export async function POST(req: Request) {
       .jpeg({ quality: 90 }) // 색감 분석용 중간 해상도
       .toBuffer();
 
-    // 5. Blob 업로드
-    const id = crypto.randomUUID();
-    const serviceBlob = await put(`service/${userId}/${id}/1024.jpg`, resized1024, {
+    // 6. 리사이즈된 이미지들을 Blob에 업로드
+    const serviceBlob = await put(`service/${userId}/${file_id}/1024.jpg`, resized1024, {
       access: 'public',
     });
-    const llmBlob = await put(`llm/${userId}/${id}/768.jpg`, resized768, {
+    const llmBlob = await put(`llm/${userId}/${file_id}/768.jpg`, resized768, {
       access: 'public',
     });
 
-    // 6. DB 저장
+    // 7. DB 저장
     await sql`
       INSERT INTO uploaded_files (
         id, user_id, file_original_name, file_type, file_url_service, file_url_llm,
         exif_brand, exif_model, exif_lens, exif_aperture, exif_shutter, exif_iso
       ) VALUES (
-        ${id}, ${userId}, ${file.name}, 'image', ${serviceBlob.url}, ${llmBlob.url},
+        ${file_id}, ${userId}, ${original_name || 'unknown'}, 'image', ${serviceBlob.url}, ${llmBlob.url},
         ${exif?.Make || null}, ${exif?.Model || null}, ${exif?.LensModel || null},
         ${exif?.FNumber || null}, ${exif?.ExposureTime || null}, ${exif?.ISO || null}
       )
     `;
 
     return NextResponse.json({
-      id,
+      id: file_id,
       file_url_service: serviceBlob.url,
       file_url_llm: llmBlob.url,
+      original_url: file_url,
       exif: {
         brand: exif?.Make || null,
         model: exif?.Model || null,
@@ -84,9 +83,9 @@ export async function POST(req: Request) {
       }
     });
   } catch (error) {
-    console.error('Error uploading file:', error);
+    console.error('Error processing image:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Image processing failed' },
       { status: 500 }
     );
   }
