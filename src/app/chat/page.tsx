@@ -409,7 +409,7 @@ export default function ChatPage() {
       const exifText = exif ?
         `카메라: ${exif.brand || "-"} ${exif.model || "-"}\n렌즈: ${exif.lens || "-"}\n조리개: ${exif.aperture || "-"}\n셔터: ${exif.shutter || "-"}\nISO: ${exif.iso || "-"}`
         : "(EXIF 정보 없음)";
-      const prompt = `아래 이미지를 전문 사진가의 시각으로 평가해 주세요.\n\n[이미지 URL]\n${url}\n\n[EXIF 정보]\n${exifText}\n\n[중요 지침]\n- EXIF 정보에서 "-" 또는 정보가 없는 항목은 응답에서 제외하거나 null로 설정하세요\n- 추측하지 말고 실제 데이터만 사용하세요\n- Unknown, likely, estimated 같은 추정 표현은 사용하지 마세요\n\n[요구 사항]\n- 한줄평, 5점 만점 점수, 카메라/렌즈/세팅, (가능하다면 ${reviewer}의 시각으로)\n- 강점 3가지, 개선점 3가지, 개선 방향성\n- composition, lighting, color, focus, creativity 5개 항목의 점수(1~5, 소수점 가능)와 각 항목별 상세 설명\n- 추가로 물어볼 수 있는 관련 질문 3가지 제안\n- 아래 JSON 스키마로만 답변(텍스트, 설명, 기타 부가정보 없이 JSON만 반환)\n\n[JSON 예시]\n{\n  "type": "photo-review",\n  "summary": {\n    "comment": "구도와 색감이 뛰어난 사진입니다.",\n    "score": 4.7,\n    "exif": {\n      "camera": "Sony A7 IV",\n      "lens": "FE 85mm F1.4 GM",\n      "aperture": "f/1.4",\n      "shutter": "1/500s",\n      "iso": "100"\n    },\n    "reviewer": "Barbara London"\n  },\n  "feedback": {\n    "strengths": ["표정 포착", "색감", "배경 흐림"],\n    "weaknesses": ["프레이밍", "하이라이트", "거리 부족"],\n    "direction": "프레이밍을 정돈하고 하이라이트 보정에 신경 쓰세요."\n  },\n  "detailed_scores": {\n    "composition": 4.5,\n    "lighting": 4.0,\n    "color": 4.8,\n    "focus": 4.2,\n    "creativity": 4.6\n  },\n  "detailed_comments": {\n    "composition": "프레임 중앙 안정감, 여백 추가 추천.",\n    "lighting": "자연광 활용, 하이라이트 일부 날아감.",\n    "color": "피부톤과 배경색 조화 우수.",\n    "focus": "눈에 정확히 초점.",\n    "creativity": "표정과 포즈 개성."\n  },\n  "suggested_questions": [\n    "이 사진을 더 드라마틱하게 편집하려면?",\n    "비슷한 스타일의 레퍼런스 사진 추천해줘",\n    "이 구도로 다른 장소에서 찍을 때 주의점은?"\n  ]\n}`;
+      const prompt = `아래 이미지를 전문 사진가의 시각으로 평가해 주세요.\n\n[이미지 URL]\n${url}\n\n[EXIF 정보]\n${exifText}\n\n[중요 지침]\n- EXIF 정보에서 "-" 또는 정보가 없는 항목은 응답에서 제외하거나 null로 설정하세요\n- 추측하지 말고 실제 데이터만 사용하세요\n- Unknown, likely, estimated 같은 추정 표현은 사용하지 마세요\n\n[요구 사항]\n- 한줄평, 5점 만점 점수, 카메라/렌즈/세팅, (가능하다면 ${reviewer}의 시각으로)\n- 강점 3가지, 개선점 3가지, 개선 방향성\n- composition, lighting, color, focus, creativity 5개 항목의 점수(1~5, 소수점 가능)와 각 항목별 상세 설명\n- 사용자가 이 평가를 바탕으로 추가로 궁금해할 만한 내용 3가지 제안 (AI가 질문하는 형태가 아닌, 사용자가 요청할 만한 내용)\n- 아래 JSON 스키마로만 답변(텍스트, 설명, 기타 부가정보 없이 JSON만 반환)\n\n[JSON 예시]\n{\n  "type": "photo-review",\n  "summary": {\n    "comment": "구도와 색감이 뛰어난 사진입니다.",\n    "score": 4.7,\n    "exif": {\n      "camera": "Sony A7 IV",\n      "lens": "FE 85mm F1.4 GM",\n      "aperture": "f/1.4",\n      "shutter": "1/500s",\n      "iso": "100"\n    },\n    "reviewer": "Barbara London"\n  },\n  "feedback": {\n    "strengths": ["표정 포착", "색감", "배경 흐림"],\n    "weaknesses": ["프레이밍", "하이라이트", "거리 부족"],\n    "direction": "프레이밍을 정돈하고 하이라이트 보정에 신경 쓰세요."\n  },\n  "detailed_scores": {\n    "composition": 4.5,\n    "lighting": 4.0,\n    "color": 4.8,\n    "focus": 4.2,\n    "creativity": 4.6\n  },\n  "detailed_comments": {\n    "composition": "프레임 중앙 안정감, 여백 추가 추천.",\n    "lighting": "자연광 활용, 하이라이트 일부 날아감.",\n    "color": "피부톤과 배경색 조화 우수.",\n    "focus": "눈에 정확히 초점.",\n    "creativity": "표정과 포즈 개성."\n  },\n  "suggested_questions": [\n    "이 사진을 더 드라마틱하게 편집하는 방법 알려줘",\n    "비슷한 스타일의 레퍼런스 사진들 보여줘",\n    "이 구도로 다른 장소에서 찍을 때 주의점 알려줘"\n  ]\n}`;
       // 사진 평가는 숨김 모드로 전송하고, 응답을 photo-review 타입으로 처리
       handlePhotoReview(prompt, url);
       return;
@@ -486,9 +486,9 @@ ${url}
     }
   },
   "suggested_questions": [
-    "이 색감을 다른 시간대에도 적용하려면?",
-    "반대 색감 스타일로 편집해보고 싶어",
-    "이 색감과 잘 어울리는 의상이나 소품은?"
+            "이 색감을 다른 시간대 사진에도 적용하는 방법 알려줘",
+        "반대 색감 스타일로 편집하는 방법도 알려줘", 
+        "이 색감과 어울리는 의상이나 소품 추천해줘"
   ]
 }`;
       handleColorAnalysis(prompt, url);
