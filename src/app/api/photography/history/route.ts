@@ -14,9 +14,9 @@ export async function GET(req: Request) {
     }
     const userId = session.user.id;
 
-    // 2. URL에서 limit 파라미터 추출 (기본값: 5)
+    // 2. URL에서 limit 파라미터 추출 (기본값: 9, 3x3 그리드용)
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '5'), 20); // 최대 20개
+    const limit = Math.min(parseInt(searchParams.get('limit') || '9'), 20); // 최대 20개
 
     // 3. 사용자의 최근 업로드 사진들 조회
     const result = await sql`

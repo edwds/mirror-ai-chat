@@ -835,6 +835,7 @@ ${url}
             BUTTON_AREA={BUTTON_AREA}
             suggestedQuestions={suggestedQuestions}
             onSuggestedQuestionClick={handleSuggestedQuestionClick}
+            onUploadClick={() => setIsUploadModalOpen(true)}
           />
         </>
       )}

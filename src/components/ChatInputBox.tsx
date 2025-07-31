@@ -16,7 +16,8 @@ export function ChatInputBox({
   chatBoxHeight,
   BUTTON_AREA,
   suggestedQuestions,
-  onSuggestedQuestionClick
+  onSuggestedQuestionClick,
+  onUploadClick
 }: {
   input: string;
   setInput: React.Dispatch<React.SetStateAction<string>>;
@@ -32,6 +33,7 @@ export function ChatInputBox({
   BUTTON_AREA: number;
   suggestedQuestions: string[];
   onSuggestedQuestionClick: (question: string) => void;
+  onUploadClick: () => void;
 }) {
   return (
     <div className="w-full px-4 py-4 bg-[#F0E8FF]">
@@ -85,20 +87,13 @@ export function ChatInputBox({
         {/* 버튼 영역 */}
         <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center px-6 pb-3 pointer-events-none">
           <div className="pointer-events-auto">
-            <input
-              type="file"
-              id="chat-file-upload"
-              className="hidden"
-              accept="image/*"
-              onChange={handleFileChange}
-            />
-            <label
-              htmlFor="chat-file-upload"
+            <button
+              onClick={onUploadClick}
               className="flex items-center gap-2 px-3 py-2 border border-gray-200 hover:border-gray-300 text-gray-700 hover:text-gray-900 cursor-pointer rounded-full transition-colors"
             >
               <Image className="w-4 h-4" />
               <span className="text-sm font-medium">사진 분석</span>
-            </label>
+            </button>
           </div>
           {isLoading ? (
             <Button

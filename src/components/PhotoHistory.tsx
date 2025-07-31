@@ -39,7 +39,7 @@ export function PhotoHistory({ onPhotoSelect, selectedAction }: PhotoHistoryProp
   const fetchPhotoHistory = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/photography/history?limit=5');
+      const response = await fetch('/api/photography/history?limit=9');
       
       if (!response.ok) {
         throw new Error('사진 히스토리를 불러올 수 없습니다');
@@ -126,67 +126,79 @@ export function PhotoHistory({ onPhotoSelect, selectedAction }: PhotoHistoryProp
         <span>최근 업로드한 사진</span>
       </div>
 
-      <div className="grid grid-cols-1 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {photos.map((photo, index) => (
           <motion.div
             key={photo.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: index * 0.1 }}
+            className="aspect-square"
           >
-            <Card 
-              className="p-4 hover:bg-gray-50 transition-colors cursor-pointer border border-gray-200 hover:border-gray-300"
+            <div 
+              className="relative w-full h-full cursor-pointer group rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors"
               onClick={() => onPhotoSelect(photo)}
             >
-              <div className="flex items-center gap-4">
-                {/* 썸네일 */}
-                <div className="flex-shrink-0">
-                  <img
-                    src={photo.serviceUrl}
-                    alt={photo.originalName || '업로드된 사진'}
-                    className="w-16 h-16 object-cover rounded-lg bg-gray-100"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
-                </div>
-
-                {/* 정보 */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-sm text-gray-900 truncate">
-                      {photo.originalName || '사진'}
-                    </h4>
-                    <span className="text-xs text-gray-500 ml-2">
+              {/* 사진 썸네일 */}
+              <img
+                src={photo.serviceUrl}
+                alt={photo.originalName || '업로드된 사진'}
+                className="w-full h-full object-cover bg-gray-100"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
+              
+              {/* 호버 오버레이 */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200">
+                <div className="absolute inset-0 flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  {/* 상단 - 날짜 */}
+                  <div className="flex justify-end">
+                    <span className="text-xs text-white bg-black/50 px-2 py-1 rounded-full">
                       {formatDate(photo.createdAt)}
                     </span>
                   </div>
                   
-                  {/* EXIF 정보 */}
-                  {(photo.exif.brand || photo.exif.model) && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Camera className="w-3 h-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">
-                        {photo.exif.brand} {photo.exif.model}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* 액션 버튼 */}
-                  <div className="mt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-xs bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
-                    >
-                      {getActionText(selectedAction)}
-                    </Button>
+                  {/* 하단 - 정보 */}
+                  <div className="text-white">
+                    <h4 className="text-sm font-medium truncate mb-1">
+                      {photo.originalName || '사진'}
+                    </h4>
+                    
+                    {/* EXIF 정보 */}
+                    {(photo.exif.brand || photo.exif.model) && (
+                      <div className="flex items-center gap-1">
+                        <Camera className="w-3 h-3" />
+                        <span className="text-xs truncate">
+                          {photo.exif.brand} {photo.exif.model}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* 액션 텍스트 */}
+                    {selectedAction && (
+                      <div className="mt-1">
+                        <span className="text-xs bg-blue-500 px-2 py-1 rounded-full">
+                          {getActionText(selectedAction)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </Card>
+            </div>
           </motion.div>
+        ))}
+        
+        {/* 빈 슬롯들 (9개가 안 되는 경우) */}
+        {Array.from({ length: Math.max(0, 9 - photos.length) }, (_, index) => (
+          <div 
+            key={`empty-${index}`}
+            className="aspect-square border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center"
+          >
+            <ImageIcon className="w-8 h-8 text-gray-300" />
+          </div>
         ))}
       </div>
     </div>
