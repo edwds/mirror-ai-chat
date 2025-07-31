@@ -10,6 +10,7 @@ import LoginButton from "@/components/LoginButton";
 import CameraCard from '@/components/CameraCard';
 import { fetchCameraInfo } from '@/lib/fetchCameraInfo';
 import { ImageUploadPreview } from '@/components/ImageUploadPreview';
+import { ImageUploadModal } from '@/components/ImageUploadModal';
 import { MessageContent } from "@/components/MessageContent";
 import { simpleMarkdown } from "@/lib/markdown";
 import type { Message } from "@/types/message";
@@ -63,6 +64,7 @@ export default function ChatPage() {
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [currentTextSuggestions, setCurrentTextSuggestions] = useState<string[]>([]);
   const [selectedImageAction, setSelectedImageAction] = useState<string | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -194,12 +196,15 @@ export default function ChatPage() {
   // 이미지 서제스트 클릭 핸들러
   const handleImageSuggestionClick = (action: string) => {
     console.log('이미지 서제스트 클릭:', action);
-    setSelectedImageAction(action);
-    // 파일 업로드 트리거
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
+    if (!session) {
+      const ok = window.confirm("사진 분석 기능은 로그인 사용자만 사용할 수 있습니다. 로그인 하시겠습니까?");
+      if (ok) {
+        signIn("google");
+      }
+      return;
     }
+    setSelectedImageAction(action);
+    setIsUploadModalOpen(true);
   };
 
   // 이미지 액션 실행 함수
@@ -236,6 +241,64 @@ export default function ChatPage() {
       setMessages(msgs => [...msgs, { 
         role: "assistant", 
         content: "이미지 처리 중 오류가 발생했습니다." 
+      }]);
+    }
+  };
+
+  // 히스토리에서 사진 선택 핸들러
+  const handlePhotoSelect = (photo: any) => {
+    console.log('히스토리에서 사진 선택:', photo, 'selectedAction:', selectedImageAction);
+    
+    if (selectedImageAction) {
+      // 바로 해당 액션 실행
+      const actionMap: Record<string, string> = {
+        'photo-review': '사진 평가',
+        'reference-analysis': '레퍼런스 분석',
+        'color-analysis': '색감 추출'
+      };
+      const selectedKey = actionMap[selectedImageAction];
+      
+      // 메시지 추가 (이미 처리된 사진이므로 image-options로 바로 추가)
+      setMessages(msgs => [...msgs, { 
+        role: "image-options", 
+        url: photo.serviceUrl,
+        exif: photo.exif,
+        selected: selectedKey,
+        selectedAction: selectedImageAction
+      }]);
+      
+      // 바로 해당 액션 실행
+      setTimeout(() => {
+        handleActionClick(selectedKey, photo.serviceUrl, messages.length, photo.exif);
+      }, 100);
+      
+      setSelectedImageAction(null); // 초기화
+    } else {
+      // 일반적인 경우 - 선택지 표시
+      setMessages(msgs => [...msgs, { 
+        role: "image-options", 
+        url: photo.serviceUrl,
+        exif: photo.exif
+      }]);
+    }
+  };
+
+  // 새 파일 선택 핸들러 (모달에서)
+  const handleNewFileSelect = (file: File) => {
+    setFile(file);
+    
+    // 선택된 이미지 액션이 있으면 selectedAction과 함께 메시지 추가
+    if (selectedImageAction) {
+      setMessages(msgs => [...msgs, { 
+        role: "image-upload", 
+        file,
+        selectedAction: selectedImageAction
+      }]);
+      setSelectedImageAction(null); // 초기화
+    } else {
+      setMessages(msgs => [...msgs, { 
+        role: "image-upload", 
+        file 
       }]);
     }
   };
@@ -775,6 +838,18 @@ ${url}
           />
         </>
       )}
+
+      {/* 이미지 업로드 모달 */}
+      <ImageUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setSelectedImageAction(null);
+        }}
+        onFileSelect={handleNewFileSelect}
+        onPhotoSelect={handlePhotoSelect}
+        selectedAction={selectedImageAction}
+      />
     </div>
   );
 }
