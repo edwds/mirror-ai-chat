@@ -92,7 +92,7 @@ export function ChatInputBox({
               className="flex items-center gap-2 px-3 py-2 border border-gray-200 hover:border-gray-300 text-gray-700 hover:text-gray-900 cursor-pointer rounded-full transition-colors"
             >
               <Image className="w-4 h-4" />
-              <span className="text-sm font-medium">사진 분석</span>
+              <span className="text-sm font-medium">사진 업로드</span>
             </button>
           </div>
           {isLoading ? (
