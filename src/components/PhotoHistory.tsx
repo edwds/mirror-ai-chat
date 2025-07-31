@@ -120,7 +120,7 @@ export function PhotoHistory({ onPhotoSelect, selectedAction }: PhotoHistoryProp
   }
 
   return (
-    <div className="space-y-4">
+    <div className="h-full overflow-y-auto space-y-4">
       <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
         <Clock className="w-4 h-4" />
         <span>최근 업로드한 사진</span>

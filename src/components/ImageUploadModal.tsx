@@ -83,11 +83,11 @@ export function ImageUploadModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-md mx-4"
+          className="relative w-full max-w-lg mx-4"
         >
           <Card className="bg-white rounded-2xl shadow-2xl overflow-hidden">
             {/* 헤더 */}
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between p-4 border-b">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   사진 선택
@@ -139,39 +139,41 @@ export function ImageUploadModal({
             </div>
 
             {/* 탭 컨텐츠 */}
-            <div className="p-6 max-h-96 overflow-y-auto">
-              {activeTab === 'history' ? (
-                <PhotoHistory 
-                  onPhotoSelect={handlePhotoSelect}
-                  selectedAction={selectedAction}
-                />
-              ) : (
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-gray-400 transition-colors">
-                      <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-4" />
-                      <p className="text-sm text-gray-600 mb-4">
-                        새로운 사진을 업로드하세요
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                        id="file-upload-modal"
-                      />
-                      <label htmlFor="file-upload-modal">
-                        <Button asChild className="cursor-pointer">
-                          <span>
-                            <Upload className="w-4 h-4 mr-2" />
-                            파일 선택
-                          </span>
-                        </Button>
-                      </label>
+            <div className="p-4">
+              <div className="h-80">
+                {activeTab === 'history' ? (
+                  <PhotoHistory 
+                    onPhotoSelect={handlePhotoSelect}
+                    selectedAction={selectedAction}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 hover:border-gray-400 transition-colors">
+                        <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-4" />
+                        <p className="text-sm text-gray-600 mb-4">
+                          새로운 사진을 업로드하세요
+                        </p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                          id="file-upload-modal"
+                        />
+                        <label htmlFor="file-upload-modal">
+                          <Button asChild className="cursor-pointer">
+                            <span>
+                              <Upload className="w-4 h-4 mr-2" />
+                              파일 선택
+                            </span>
+                          </Button>
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </Card>
         </motion.div>
