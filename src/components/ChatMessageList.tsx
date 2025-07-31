@@ -6,6 +6,7 @@ import { MessageContent } from "@/components/MessageContent";
 import CameraCard from "@/components/CameraCard";
 import { ImageUploadPreview } from "@/components/ImageUploadPreview";
 import React, { useState, useEffect } from "react";
+
 import type { Message } from "@/types/message";
 import { AIProfile } from '@/components/AIProfile';
 import { getCurrentPersona } from '@/lib/personas';
@@ -819,7 +820,39 @@ export function ChatMessageList({
                   onUploadComplete={(url: string, exif?: any) => {
                     setMessages(msgs => {
                       const newMsgs = [...msgs];
-                      newMsgs[idx] = { role: "image-options", url, exif };
+                      const currentMsg = newMsgs[idx];
+                      
+                      // selectedAction이 있으면 바로 selected 상태로 설정하여 선택지 스킵
+                      if (currentMsg.role === "image-upload" && currentMsg.selectedAction) {
+                        const actionMap: Record<string, string> = {
+                          'photo-review': '사진 평가',
+                          'reference-analysis': '레퍼런스 분석', 
+                          'color-analysis': '색감 추출'
+                        };
+                        const selectedKey = actionMap[currentMsg.selectedAction];
+                        
+                        newMsgs[idx] = { 
+                          role: "image-options", 
+                          url, 
+                          exif,
+                          selected: selectedKey,
+                          selectedAction: currentMsg.selectedAction
+                        };
+                        
+                        // 바로 해당 액션 실행
+                        setTimeout(() => {
+                          handleActionClick(selectedKey, url, idx, exif);
+                        }, 100);
+                      } else {
+                        // 일반적인 경우 - 선택지 표시
+                        newMsgs[idx] = { 
+                          role: "image-options", 
+                          url, 
+                          exif,
+                          selectedAction: currentMsg.role === "image-upload" ? currentMsg.selectedAction : undefined
+                        };
+                      }
+                      
                       return newMsgs;
                     });
                   }}
@@ -902,6 +935,7 @@ export function ChatMessageList({
 
           return (
             <div key={idx} className="flex flex-col mb-4 items-start space-y-4">
+              
               {/* 1. 업로드된 이미지 - 즉시 표시 */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -918,8 +952,8 @@ export function ChatMessageList({
                 </div>
               </motion.div>
               
-              {/* 2. AI 대화형 메시지 - 0.5초 후 표시 */}
-              {!msg.selected && (
+              {/* 2. AI 대화형 메시지 - selectedAction이 없고 선택되지 않은 경우만 표시 */}
+              {!msg.selected && !msg.selectedAction && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -935,26 +969,45 @@ export function ChatMessageList({
                 </motion.div>
               )}
               
-              {/* 3. 옵션 버튼들 - 1초 후 순차 표시 */}
-              <div className="flex flex-col gap-2 w-full">
-                {!msg.selected ? (
-                  actions.map((action, actionIdx) => (
+              {/* 3. 옵션 버튼들 또는 선택된 버튼 - selectedAction이 없는 경우만 표시 */}
+              {!msg.selectedAction && (
+                <div className="flex flex-col gap-2 w-full">
+                  {!msg.selected ? (
+                    actions.map((action, actionIdx) => (
+                      <motion.div
+                        key={action.key}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: 1.0 + (actionIdx * 0.1) }}
+                        className="flex justify-end"
+                      >
+                        <button
+                          onClick={() => handleActionClick(action.key, msg.url, idx, msg.exif)}
+                          className="px-4 py-3 bg-white text-gray-700 rounded-3xl rounded-tr-md max-w-[80%] w-fit shadow-sm"
+                        >
+                          {action.display}
+                        </button>
+                      </motion.div>
+                    ))
+                  ) : (
+                    // 선택된 버튼 표시
                     <motion.div
-                      key={action.key}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: 1.0 + (actionIdx * 0.1) }}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
                       className="flex justify-end"
                     >
-                      <button
-                        onClick={() => handleActionClick(action.key, msg.url, idx, msg.exif)}
-                        className="px-4 py-3 bg-white text-gray-700 rounded-3xl rounded-tr-md max-w-[80%] w-fit shadow-sm"
-                      >
-                        {action.display}
-                      </button>
+                      <Card className="p-4 shadow-none border-0 bg-gradient-to-r from-[#7B47F0] via-[#6055F0] to-[#4762F0] text-white rounded-3xl rounded-tr-md max-w-[80%] w-fit">
+                        {actions.find(a => a.key === msg.selected)?.display || msg.selected}
+                      </Card>
                     </motion.div>
-                  ))
-                ) : (
+                  )}
+                </div>
+              )}
+
+              {/* 4. selectedAction이 있는 경우 - 선택된 버튼만 표시 */}
+              {msg.selectedAction && msg.selected && (
+                <div className="flex flex-col gap-2 w-full">
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -965,7 +1018,8 @@ export function ChatMessageList({
                       {actions.find(a => a.key === msg.selected)?.display || msg.selected}
                     </Card>
                   </motion.div>
-                )}
+                </div>
+              )}
               </div>
             </div>
           );

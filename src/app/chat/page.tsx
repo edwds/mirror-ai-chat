@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Image, ArrowUp, ArrowDown, Square } from "lucide-react";
+import { Image, ArrowUp, ArrowDown, Square, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import React from "react";
 import LoginButton from "@/components/LoginButton";
@@ -17,12 +17,31 @@ import { ChatMessageList } from "@/components/ChatMessageList";
 import { ChatInputBox } from "@/components/ChatInputBox";
 import { signIn, useSession } from "next-auth/react";
 
-const SUGGESTIONS = [
-  "사진 더 멋지게 찍는 팁 알려줘",
-  "입문자용 카메라/렌즈 추천해줘",
-  "내 사진, 솔직하게 평가해줘",
-  "색감 보정법 알려줘",
-  "나만의 사진 스타일 찾고 싶어"
+const TEXT_SUGGESTION_SETS = [
+  [
+    "사진 더 멋지게 찍는 팁 알려줘",
+    "입문자용 카메라/렌즈 추천해줘", 
+    "색감 보정법 알려줘",
+    "나만의 사진 스타일 찾고 싶어"
+  ],
+  [
+    "골든아워 촬영법 알려줘",
+    "보케 효과 만드는 방법",
+    "야경 촬영 설정값 추천",
+    "필름 톤 만들기"
+  ],
+  [
+    "실내 인물 촬영 조명 팁",
+    "여행용 가벼운 렌즈 추천",
+    "미니멀 사진 찍는 법",
+    "라이트룸 기본 보정 순서"
+  ]
+];
+
+const IMAGE_SUGGESTIONS = [
+  { icon: "🎯", text: "사진 평가", action: "photo-review" },
+  { icon: "🔍", text: "레퍼런스 분석", action: "reference-analysis" },
+  { icon: "🎨", text: "색감 추출", action: "color-analysis" }
 ];
 
 export default function ChatPage() {
@@ -42,8 +61,16 @@ export default function ChatPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [currentTextSuggestions, setCurrentTextSuggestions] = useState<string[]>([]);
+  const [selectedImageAction, setSelectedImageAction] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 컴포넌트 마운트 시 랜덤 텍스트 서제스트 셋 선택
+  useEffect(() => {
+    const randomIndex = Math.floor(Math.random() * TEXT_SUGGESTION_SETS.length);
+    setCurrentTextSuggestions(TEXT_SUGGESTION_SETS[randomIndex]);
+  }, []);
 
   // photo-review 메시지들을 텍스트로 변환하여 히스토리에 포함하는 함수
   const convertToHistoryMessage = (msg: any) => {
@@ -114,6 +141,7 @@ export default function ChatPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileChange 시작 - selectedImageAction:', selectedImageAction);
     if (!session) {
       const ok = window.confirm("파일 첨부 기능은 로그인 사용자만 사용할 수 있습니다. 로그인 하시겠습니까?");
       if (ok) {
@@ -121,6 +149,7 @@ export default function ChatPage() {
       }
       // 파일 인풋 초기화 (같은 파일 재선택 가능하게)
       if (e.target) e.target.value = "";
+      setSelectedImageAction(null); // 초기화
       return;
     }
     
@@ -143,10 +172,72 @@ export default function ChatPage() {
 
     // 직접 업로드 진행
     setFile(file);
-    setMessages(msgs => [...msgs, { 
-      role: "image-upload", 
-      file 
-    }]);
+    
+    // 선택된 이미지 액션이 있으면 selectedAction과 함께 메시지 추가
+    if (selectedImageAction) {
+      console.log('selectedAction과 함께 메시지 추가:', selectedImageAction);
+      setMessages(msgs => [...msgs, { 
+        role: "image-upload", 
+        file,
+        selectedAction: selectedImageAction
+      }]);
+      setSelectedImageAction(null); // 초기화
+    } else {
+      console.log('일반 이미지 업로드 메시지 추가');
+      setMessages(msgs => [...msgs, { 
+        role: "image-upload", 
+        file 
+      }]);
+    }
+  };
+
+  // 이미지 서제스트 클릭 핸들러
+  const handleImageSuggestionClick = (action: string) => {
+    console.log('이미지 서제스트 클릭:', action);
+    setSelectedImageAction(action);
+    // 파일 업로드 트리거
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
+  // 이미지 액션 실행 함수
+  const executeImageAction = async (action: string, imageFile: File) => {
+    if (!imageFile) return;
+
+    // 우선 이미지 업로드 처리
+    const formData = new FormData();
+    formData.append('file', imageFile);
+
+    try {
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) throw new Error('업로드 실패');
+      const { url: imageUrl } = await uploadResponse.json();
+
+      // 각 액션에 따라 다른 기능 실행
+      switch (action) {
+        case 'photo-review':
+          handleActionClick("사진 평가", imageUrl, messages.length, null);
+          break;
+        case 'reference-analysis':
+          handleActionClick("레퍼런스 분석", imageUrl, messages.length, null);
+          break;
+        case 'color-analysis':
+          handleActionClick("색감 추출", imageUrl, messages.length, null);
+          break;
+      }
+    } catch (error) {
+      console.error('이미지 처리 오류:', error);
+      setMessages(msgs => [...msgs, { 
+        role: "assistant", 
+        content: "이미지 처리 중 오류가 발생했습니다." 
+      }]);
+    }
   };
 
   const handleSend = async (overrideMessage?: string, isHidden?: boolean) => {
@@ -571,7 +662,8 @@ ${url}
                 </Button>
               </div>
               <div className="flex flex-wrap gap-3 mt-2 justify-center">
-                {SUGGESTIONS.map(s => (
+                {/* 텍스트 서제스트 (말풍선 아이콘) */}
+                {currentTextSuggestions.map(s => (
                   <Button
                     key={s}
                     variant="ghost"
@@ -589,9 +681,38 @@ ${url}
                       text-sm
                       shadow-none
                       border-none
+                      flex items-center gap-2
                     "
                   >
+                    <MessageCircle className="w-4 h-4" />
                     {s}
+                  </Button>
+                ))}
+                
+                {/* 이미지 서제스트 (기능별 이모지 아이콘) */}
+                {IMAGE_SUGGESTIONS.map(s => (
+                  <Button
+                    key={s.action}
+                    variant="ghost"
+                    onClick={() => handleImageSuggestionClick(s.action)}
+                    className="
+                      rounded-full 
+                      bg-transparent 
+                      text-gray-100/50
+                      hover:bg-gray-100/50 
+                      hover:text-gray-900 
+                      focus:bg-gray-100 
+                      focus:text-gray-900
+                      transition-colors 
+                      px-5 py-2 
+                      text-sm
+                      shadow-none
+                      border-none
+                      flex items-center gap-2
+                    "
+                  >
+                    <span className="text-base">{s.icon}</span>
+                    {s.text}
                   </Button>
                 ))}
               </div>
