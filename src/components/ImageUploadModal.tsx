@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, Upload, Clock, Image as ImageIcon } from "lucide-react";
 import { PhotoHistory } from "@/components/PhotoHistory";
@@ -85,18 +84,13 @@ export function ImageUploadModal({
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative w-full max-w-lg mx-4"
         >
-          <Card className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
             {/* 헤더 */}
             <div className="flex items-center justify-between p-4 border-b">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   사진 선택
                 </h2>
-                {selectedAction && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    {getActionText(selectedAction)}을 위한 사진을 선택하세요
-                  </p>
-                )}
               </div>
               <Button
                 variant="ghost"
@@ -175,7 +169,7 @@ export function ImageUploadModal({
                 )}
               </div>
             </div>
-          </Card>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

@@ -37,11 +37,23 @@ export async function GET(req: Request) {
         AND status = 'normal'
         AND file_type = 'image'
       ORDER BY created_at DESC 
-      LIMIT ${limit}
+      LIMIT ${limit * 2}
     `;
 
-    // 4. 결과 포맷팅
-    const photos = result.rows.map(row => ({
+    // 4. 파일명 중복 제거 (최신 것만 유지)
+    const seenNames = new Set();
+    const uniquePhotos = result.rows
+      .filter(row => {
+        if (seenNames.has(row.file_original_name)) {
+          return false;
+        }
+        seenNames.add(row.file_original_name);
+        return true;
+      })
+      .slice(0, limit);
+
+    // 5. 결과 포맷팅
+    const photos = uniquePhotos.map(row => ({
       id: row.id,
       originalName: row.file_original_name,
       serviceUrl: row.file_url_service,
