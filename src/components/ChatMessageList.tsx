@@ -1020,7 +1020,6 @@ export function ChatMessageList({
                   </motion.div>
                 </div>
               )}
-              </div>
             </div>
           );
         } else if (msg.role === "photo-review-summary") {
